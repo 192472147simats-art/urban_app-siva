@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="gov-header">
+    <h1>Service Requests – Admin Dashboard</h1>
+</header>
+
+<main class="container" style="max-width: 1000px;">
+
+    <div style="text-align:right; margin-bottom:10px;">
+        <a href="/admin/logout">Logout</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="alert {{ category }}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if data %}
+    <table width="100%" border="1" cellspacing="0" cellpadding="8">
+        <tr>
+            <th>ID</th>
+            <th>Citizen</th>
+            <th>Issue</th>
+            <th>Area</th>
+            <th>Status</th>
+            <th>Update</th>
+        </tr>
+
+        {% for row in data %}
+        <tr>
+            <td>{{ row.id }}</td>
+            <td>{{ row.citizen_name }}</td>
+            <td>{{ row.issue_type }}</td>
+            <td>{{ row.area }}</td>
+            <td>
+                {% if row.status == 'Approved' %}
+                    <span style="color:green;">Approved</span>
+                {% elif row.status == 'Rejected' %}
+                    <span style="color:red;">Rejected</span>
+                {% elif row.status == 'In Progress' %}
+                    <span style="color:orange;">In Progress</span>
+                {% else %}
+                    <span>Pending</span>
+                {% endif %}
+            </td>
+            <td>
+                <form method="POST" action="/update_status" style="display:inline;">
+                    <input type="hidden" name="id" value="{{ row.id }}">
+                    <select name="status" required>
+                        <option disabled selected>Change</option>
+                        <option>Approved</option>
+                        <option>Rejected</option>
+                        <option>In Progress</option>
+                        <option>Resolved</option>
+                    </select>
+                    <button type="submit">Update</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+        <p>No service requests found.</p>
+    {% endif %}
+
+</main>
+
+</body>
+</html>

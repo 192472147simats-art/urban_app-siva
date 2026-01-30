@@ -1,0 +1,99 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f2f4f7;
+}
+
+.gov-header {
+    background: #0b5ed7;
+    color: white;
+    padding: 15px;
+    text-align: center;
+}
+
+.container {
+    max-width: 600px;
+    margin: 30px auto;
+    background: white;
+    padding: 25px;
+    border: 1px solid #ddd;
+}
+
+label {
+    display: block;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+}
+
+textarea {
+    resize: vertical;
+}
+
+.location-row {
+    display: flex;
+    gap: 10px;
+}
+
+.location-row button {
+    background: #198754;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.issue-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.issue-grid div {
+    border: 1px solid #0b5ed7;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    background: #e7f1ff;
+}
+
+.issue-grid div:hover {
+    background: #cfe2ff;
+}
+
+.submit-btn {
+    margin-top: 25px;
+    width: 100%;
+    background: #0b5ed7;
+    color: white;
+    border: none;
+    padding: 12px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.hidden {
+    display: none;
+}
+
+.alert {
+    padding: 10px;
+    margin-bottom: 15px;
+}
+
+.alert.success {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.alert.error {
+    background: #f8d7da;
+    color: #842029;
+}

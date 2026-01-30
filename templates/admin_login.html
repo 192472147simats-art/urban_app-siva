@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="gov-header">
+    <h1>Urban Utility Admin Panel</h1>
+</header>
+
+<main class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="alert {{ category }}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/admin/login">
+        <label>Admin Username</label>
+        <input type="text" name="username" required>
+
+        <label>Admin Password</label>
+        <input type="password" name="password" required>
+
+        <button class="submit-btn" type="submit">Login</button>
+    </form>
+
+</main>
+
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Urban Service Request System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+
+<header class="gov-header">
+    <h1>Urban Service Request System</h1>
+</header>
+
+<main class="container">
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="alert {{ category }}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- SERVICE REQUEST FORM -->
+    <form method="POST" action="/submit">
+
+        <label>Citizen Name</label>
+        <input type="text" value="{{ user_name }}" readonly>
+
+        <label>Mobile Number</label>
+        <input type="text" value="{{ session['user_mobile'] }}" readonly>
+
+        <label>Location</label>
+        <div class="location-row">
+            <input type="text" name="area" id="area" placeholder="Auto-detected location" readonly required>
+            <button type="button" onclick="getLocation()">Use My Current Location</button>
+        </div>
+
+        <label>Street / Landmark (Optional)</label>
+        <input type="text" name="address" placeholder="Street or nearby landmark">
+
+        <label>Select Issue Type</label>
+        <div class="issue-grid">
+            <div onclick="selectIssue('Road Issue')">Road Issue</div>
+            <div onclick="selectIssue('Street Light Issue')">Street Light</div>
+            <div onclick="selectIssue('Garbage Issue')">Garbage</div>
+            <div onclick="selectIssue('Drainage Issue')">Drainage</div>
+            <div onclick="selectIssue('Other')">Other</div>
+        </div>
+
+        <input type="hidden" name="issue" id="issue" required>
+
+        <div id="otherIssueBox" class="hidden">
+            <label>Describe Other Issue</label>
+            <textarea name="other_issue"></textarea>
+        </div>
+
+        <label>Issue Description</label>
+        <textarea name="description" required></textarea>
+
+        <button type="submit" class="submit-btn">Submit Request</button>
+    </form>
+
+    <hr>
+
+    <!-- MY REQUESTS TABLE -->
+    <h2>My Service Requests</h2>
+
+    {% if requests_data %}
+    <table width="100%" border="1" cellpadding="8">
+        <tr>
+            <th>ID</th>
+            <th>Issue</th>
+            <th>Area</th>
+            <th>Status</th>
+        </tr>
+        {% for r in requests_data %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.issue_type }}</td>
+            <td>{{ r.area }}</td>
+            <td>{{ r.status }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+        <p>No service requests submitted yet.</p>
+    {% endif %}
+
+    <br>
+    <a href="/logout">Logout</a>
+
+</main>
+
+</body>
+</html>
