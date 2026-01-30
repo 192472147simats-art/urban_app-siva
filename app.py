@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-import mysql.connector
+import psycopg2
+import psycopg2.extras
+import os
 import re
 
 app = Flask(__name__)
@@ -9,14 +11,14 @@ app.secret_key = "dev-secret-key"
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
 
-# ---------- DATABASE ----------
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="Sirisiva8$",
-    database="urban_db"
-)
-cursor = db.cursor(dictionary=True)
+# ---------- DATABASE (POSTGRESQL - RENDER) ----------
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL not found in environment variables")
+
+conn = psycopg2.connect(DATABASE_URL)
+cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 # ---------- USER LOGIN ----------
 @app.route("/", methods=["GET", "POST"])
@@ -90,7 +92,7 @@ def submit_request():
     cursor.execute("""
         INSERT INTO service_requests
         (citizen_name, mobile, issue_type, area, address, description, status)
-        VALUES (%s,%s,%s,%s,%s,%s,'Pending')
+        VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
     """, (
         session["user_name"],
         session["user_mobile"],
@@ -99,7 +101,7 @@ def submit_request():
         address,
         description
     ))
-    db.commit()
+    conn.commit()
 
     flash("Service request submitted successfully", "success")
     return redirect(url_for("user_dashboard"))
@@ -153,7 +155,7 @@ def update_status():
         "UPDATE service_requests SET status=%s WHERE id=%s",
         (status, req_id)
     )
-    db.commit()
+    conn.commit()
 
     flash("Status updated successfully", "success")
     return redirect(url_for("admin_dashboard"))
