@@ -7,18 +7,15 @@ import re
 app = Flask(__name__)
 app.secret_key = "dev-secret-key"
 
+# ---------- DATABASE (POSTGRESQL) ----------
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+conn.autocommit = True
+
 # ---------- ADMIN CREDENTIALS ----------
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
-
-# ---------- DATABASE (POSTGRESQL - RENDER) ----------
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise Exception("DATABASE_URL not found in environment variables")
-
-conn = psycopg2.connect(DATABASE_URL)
-cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 # ---------- USER LOGIN ----------
 @app.route("/", methods=["GET", "POST"])
@@ -47,11 +44,14 @@ def user_dashboard():
     if not session.get("user_mobile"):
         return redirect(url_for("user_login"))
 
-    cursor.execute(
-        "SELECT id, issue_type, area, status FROM service_requests WHERE mobile=%s ORDER BY id DESC",
-        (session["user_mobile"],)
-    )
-    requests_data = cursor.fetchall()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, issue_type, area, status
+            FROM service_requests
+            WHERE mobile = %s
+            ORDER BY id DESC
+        """, (session["user_mobile"],))
+        requests_data = cur.fetchall()
 
     return render_template(
         "user_dashboard.html",
@@ -81,27 +81,23 @@ def submit_request():
             return redirect(url_for("user_dashboard"))
         issue = other_issue
 
-    if not area:
-        flash("Detect your location first", "error")
+    if not area or not description:
+        flash("All fields are required", "error")
         return redirect(url_for("user_dashboard"))
 
-    if not description:
-        flash("Issue description required", "error")
-        return redirect(url_for("user_dashboard"))
-
-    cursor.execute("""
-        INSERT INTO service_requests
-        (citizen_name, mobile, issue_type, area, address, description, status)
-        VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
-    """, (
-        session["user_name"],
-        session["user_mobile"],
-        issue,
-        area,
-        address,
-        description
-    ))
-    conn.commit()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO service_requests
+            (citizen_name, mobile, issue_type, area, address, description, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
+        """, (
+            session["user_name"],
+            session["user_mobile"],
+            issue,
+            area,
+            address,
+            description
+        ))
 
     flash("Service request submitted successfully", "success")
     return redirect(url_for("user_dashboard"))
@@ -133,8 +129,10 @@ def admin_dashboard():
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_login"))
 
-    cursor.execute("SELECT * FROM service_requests ORDER BY id DESC")
-    data = cursor.fetchall()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM service_requests ORDER BY id DESC")
+        data = cur.fetchall()
+
     return render_template("admin_dashboard.html", data=data)
 
 # ---------- UPDATE STATUS ----------
@@ -146,16 +144,11 @@ def update_status():
     req_id = request.form.get("id")
     status = request.form.get("status")
 
-    allowed = {"Approved", "Rejected", "In Progress", "Resolved"}
-    if status not in allowed:
-        flash("Invalid status", "error")
-        return redirect(url_for("admin_dashboard"))
-
-    cursor.execute(
-        "UPDATE service_requests SET status=%s WHERE id=%s",
-        (status, req_id)
-    )
-    conn.commit()
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE service_requests SET status=%s WHERE id=%s",
+            (status, req_id)
+        )
 
     flash("Status updated successfully", "success")
     return redirect(url_for("admin_dashboard"))
@@ -168,4 +161,4 @@ def admin_logout():
 
 # ---------- RUN ----------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
