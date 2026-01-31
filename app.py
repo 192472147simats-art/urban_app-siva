@@ -1,17 +1,20 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-import psycopg2
-import psycopg2.extras
+import psycopg
+import psycopg.rows
 import os
 import re
 
 app = Flask(__name__)
-app.secret_key = "dev-secret-key"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 # ---------- DATABASE (POSTGRESQL) ----------
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-conn.autocommit = True
+def get_conn():
+    return psycopg.connect(
+        DATABASE_URL,
+        row_factory=psycopg.rows.dict_row
+    )
 
 # ---------- ADMIN CREDENTIALS ----------
 ADMIN_USERNAME = "admin"
@@ -44,14 +47,18 @@ def user_dashboard():
     if not session.get("user_mobile"):
         return redirect(url_for("user_login"))
 
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, issue_type, area, status
-            FROM service_requests
-            WHERE mobile = %s
-            ORDER BY id DESC
-        """, (session["user_mobile"],))
-        requests_data = cur.fetchall()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, issue_type, area, status
+                FROM service_requests
+                WHERE mobile = %s
+                ORDER BY id DESC
+                """,
+                (session["user_mobile"],)
+            )
+            requests_data = cur.fetchall()
 
     return render_template(
         "user_dashboard.html",
@@ -85,19 +92,23 @@ def submit_request():
         flash("All fields are required", "error")
         return redirect(url_for("user_dashboard"))
 
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO service_requests
-            (citizen_name, mobile, issue_type, area, address, description, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
-        """, (
-            session["user_name"],
-            session["user_mobile"],
-            issue,
-            area,
-            address,
-            description
-        ))
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO service_requests
+                (citizen_name, mobile, issue_type, area, address, description, status)
+                VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
+                """,
+                (
+                    session["user_name"],
+                    session["user_mobile"],
+                    issue,
+                    area,
+                    address,
+                    description
+                )
+            )
 
     flash("Service request submitted successfully", "success")
     return redirect(url_for("user_dashboard"))
@@ -129,9 +140,10 @@ def admin_dashboard():
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_login"))
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM service_requests ORDER BY id DESC")
-        data = cur.fetchall()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM service_requests ORDER BY id DESC")
+            data = cur.fetchall()
 
     return render_template("admin_dashboard.html", data=data)
 
@@ -144,11 +156,12 @@ def update_status():
     req_id = request.form.get("id")
     status = request.form.get("status")
 
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE service_requests SET status=%s WHERE id=%s",
-            (status, req_id)
-        )
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE service_requests SET status = %s WHERE id = %s",
+                (status, req_id)
+            )
 
     flash("Status updated successfully", "success")
     return redirect(url_for("admin_dashboard"))
@@ -158,7 +171,3 @@ def update_status():
 def admin_logout():
     session.clear()
     return redirect(url_for("admin_login"))
-
-# ---------- RUN ----------
-if __name__ == "__main__":
-    app.run()
