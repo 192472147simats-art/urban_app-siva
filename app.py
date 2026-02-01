@@ -1,20 +1,18 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import psycopg
-import psycopg.rows
 import os
 import re
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-# ---------- DATABASE (POSTGRESQL) ----------
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# ---------- DB HELPER ----------
 def get_conn():
-    return psycopg.connect(
-        DATABASE_URL,
-        row_factory=psycopg.rows.dict_row
-    )
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
+    return psycopg.connect(DATABASE_URL)
 
 # ---------- ADMIN CREDENTIALS ----------
 ADMIN_USERNAME = "admin"
@@ -49,15 +47,12 @@ def user_dashboard():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT id, issue_type, area, status
                 FROM service_requests
                 WHERE mobile = %s
                 ORDER BY id DESC
-                """,
-                (session["user_mobile"],)
-            )
+            """, (session["user_mobile"],))
             requests_data = cur.fetchall()
 
     return render_template(
@@ -94,21 +89,18 @@ def submit_request():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO service_requests
                 (citizen_name, mobile, issue_type, area, address, description, status)
                 VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
-                """,
-                (
-                    session["user_name"],
-                    session["user_mobile"],
-                    issue,
-                    area,
-                    address,
-                    description
-                )
-            )
+            """, (
+                session["user_name"],
+                session["user_mobile"],
+                issue,
+                area,
+                address,
+                description
+            ))
 
     flash("Service request submitted successfully", "success")
     return redirect(url_for("user_dashboard"))
@@ -159,7 +151,7 @@ def update_status():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE service_requests SET status = %s WHERE id = %s",
+                "UPDATE service_requests SET status=%s WHERE id=%s",
                 (status, req_id)
             )
 
