@@ -1,16 +1,22 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import psycopg
+from psycopg.rows import dict_row
 import os
 import re
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
+# ---------- DATABASE CONNECTION (SAFE FOR RENDER) ----------
 DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 
-# ---------- DB HELPER ----------
 def get_conn():
-    return psycopg.connect(DATABASE_URL)
+    return psycopg.connect(
+        DATABASE_URL,
+        row_factory=dict_row
+    )
 
 # ---------- ADMIN CREDENTIALS ----------
 ADMIN_USERNAME = "admin"
@@ -149,7 +155,7 @@ def update_status():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE service_requests SET status=%s WHERE id=%s",
+                "UPDATE service_requests SET status = %s WHERE id = %s",
                 (status, req_id)
             )
 
@@ -161,3 +167,7 @@ def update_status():
 def admin_logout():
     session.clear()
     return redirect(url_for("admin_login"))
+
+# ---------- RUN ----------
+if __name__ == "__main__":
+    app.run()
