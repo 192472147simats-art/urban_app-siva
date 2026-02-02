@@ -10,8 +10,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # ---------- DB HELPER ----------
 def get_conn():
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL is not set")
     return psycopg.connect(DATABASE_URL)
 
 # ---------- ADMIN CREDENTIALS ----------
