@@ -3,11 +3,12 @@ import psycopg
 from psycopg.rows import dict_row
 import os
 import re
+from rl_agent import RLAgent
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-# ---------- DATABASE CONNECTION (SAFE FOR RENDER) ----------
+# ---------- DATABASE CONNECTION ----------
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is not set")
@@ -17,6 +18,9 @@ def get_conn():
         DATABASE_URL,
         row_factory=dict_row
     )
+
+# ---------- RL AGENT ----------
+agent = RLAgent()
 
 # ---------- ADMIN CREDENTIALS ----------
 ADMIN_USERNAME = "admin"
@@ -52,7 +56,7 @@ def user_dashboard():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, issue_type, area, status
+                SELECT id, issue_type, area, status, priority
                 FROM service_requests
                 WHERE mobile = %s
                 ORDER BY id DESC
@@ -93,42 +97,34 @@ def submit_request():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
+
+            # Count pending requests
+            cur.execute("SELECT COUNT(*) as count FROM service_requests WHERE status='Pending'")
+            pending_count = cur.fetchone()['count']
+
+            # Define state
+            state = agent.get_state(issue, area, pending_count)
+
+            # Agent chooses priority
+            priority = agent.choose_action(state)
+
+            # Insert request with priority
             cur.execute("""
                 INSERT INTO service_requests
-                (citizen_name, mobile, issue_type, area, address, description, status)
-                VALUES (%s, %s, %s, %s, %s, %s, 'Pending')
+                (citizen_name, mobile, issue_type, area, address, description, status, priority)
+                VALUES (%s, %s, %s, %s, %s, %s, 'Pending', %s)
             """, (
                 session["user_name"],
                 session["user_mobile"],
                 issue,
                 area,
                 address,
-                description
+                description,
+                priority
             ))
 
-    flash("Service request submitted successfully", "success")
+    flash(f"Service request submitted with {priority} priority", "success")
     return redirect(url_for("user_dashboard"))
-
-# ---------- USER LOGOUT ----------
-@app.route("/logout")
-def user_logout():
-    session.clear()
-    return redirect(url_for("user_login"))
-
-# ---------- ADMIN LOGIN ----------
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login():
-    if request.method == "POST":
-        if (
-            request.form.get("username") == ADMIN_USERNAME and
-            request.form.get("password") == ADMIN_PASSWORD
-        ):
-            session["admin_logged_in"] = True
-            return redirect(url_for("admin_dashboard"))
-
-        flash("Invalid admin credentials", "error")
-
-    return render_template("admin_login.html")
 
 # ---------- ADMIN DASHBOARD ----------
 @app.route("/admin")
@@ -154,15 +150,63 @@ def update_status():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
+
+            # Get request info before updating
+            cur.execute("SELECT issue_type, area, priority FROM service_requests WHERE id=%s", (req_id,))
+            row = cur.fetchone()
+
+            issue = row["issue_type"]
+            area = row["area"]
+            priority = row["priority"]
+
+            # Reward logic (simple simulation)
+            reward = 0
+            if status == "Approved" and priority == "High":
+                reward = 10
+            elif status == "Approved" and priority == "Medium":
+                reward = 5
+            elif status == "Rejected":
+                reward = -5
+
+            # Count pending for state
+            cur.execute("SELECT COUNT(*) as count FROM service_requests WHERE status='Pending'")
+            pending_count = cur.fetchone()['count']
+
+            state = agent.get_state(issue, area, pending_count)
+
+            # Update Q-table
+            agent.update(state, priority, reward)
+
+            # Update DB status
             cur.execute(
                 "UPDATE service_requests SET status = %s WHERE id = %s",
                 (status, req_id)
             )
 
-    flash("Status updated successfully", "success")
+    flash("Status updated and RL agent trained", "success")
     return redirect(url_for("admin_dashboard"))
 
-# ---------- ADMIN LOGOUT ----------
+# ---------- ADMIN LOGIN ----------
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        if (
+            request.form.get("username") == ADMIN_USERNAME and
+            request.form.get("password") == ADMIN_PASSWORD
+        ):
+            session["admin_logged_in"] = True
+            return redirect(url_for("admin_dashboard"))
+
+        flash("Invalid admin credentials", "error")
+
+    return render_template("admin_login.html")
+
+# ---------- LOGOUTS ----------
+@app.route("/logout")
+def user_logout():
+    session.clear()
+    return redirect(url_for("user_login"))
+
 @app.route("/admin/logout")
 def admin_logout():
     session.clear()
